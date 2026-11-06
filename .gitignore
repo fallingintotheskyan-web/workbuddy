@@ -1,0 +1,30 @@
+# Toolchains kept inside the project so no admin rights are needed
+.toolchains/
+
+# Flutter / Dart
+client/.dart_tool/
+client/build/
+client/.flutter-plugins
+client/.flutter-plugins-dependencies
+client/windows/flutter/ephemeral/
+client/android/.gradle/
+client/android/local.properties
+client/android/app/src/main/jniLibs/
+
+# Python backend
+server/.venv/
+server/__pycache__/
+server/**/__pycache__/
+server/.pytest_cache/
+server/logs/
+server/.env
+
+# OS / editors
+.DS_Store
+Thumbs.db
+*.log
+.idea/
+.vscode/
+
+# Native build outputs
+client/android/build/

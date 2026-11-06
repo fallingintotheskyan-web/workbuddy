@@ -28,3 +28,6 @@ Thumbs.db
 
 # Native build outputs
 client/android/build/
+
+# pip leftovers
+server/pip-*

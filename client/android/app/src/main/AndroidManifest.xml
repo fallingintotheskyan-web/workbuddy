@@ -1,6 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Needed from phase 2 onwards for the WebSocket ASR stream; harmless now. -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Live microphone capture: 16 kHz mono PCM streamed to the ASR proxy. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
     <application
         android:label="课堂速记"
         android:name="${applicationName}"

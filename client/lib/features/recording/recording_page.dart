@@ -8,6 +8,7 @@ import '../../models/language.dart';
 import '../../state/demo_session.dart';
 import '../../state/recording_session.dart';
 import '../../state/transcript_controller.dart';
+import '../../state/ws_recording_session.dart';
 import 'widgets/status_chip.dart';
 import 'widgets/subtitle_list.dart';
 
@@ -32,7 +33,9 @@ class _RecordingPageState extends State<RecordingPage> {
   void initState() {
     super.initState();
     _transcript = TranscriptController();
-    _session = DemoRecordingSession();
+    _session = kUseDemoSession
+        ? DemoRecordingSession()
+        : WsRecordingSession(endpoint: asrEndpoint);
     _subscription = _session.events.listen(_transcript.apply);
     _session.updateTranslation(
       enabled: _transcript.translateEnabled,

@@ -3,9 +3,9 @@
 课堂实时录音 → 流式字幕 → 可选翻译的跨平台 App。Flutter 客户端（Android / Windows），
 FastAPI 负责代理 ASR 与翻译，密钥只存在后端 `.env`。
 
-> 当前进度：**阶段 1（Flutter 壳 + 待机视频 + 录音页 UI）已完成**。
-> 阶段 2 起接入真实 16 kHz PCM 采集与 Deepgram 流式 ASR。
-> 现在录音页使用 `DemoRecordingSession` 产生演示字幕，方便先验收 UI 与状态切换。
+> 当前进度：**阶段 2 代码完成**（16 kHz PCM 采集、WebSocket 代理、Deepgram 适配器、
+> partial/final 字幕闭环）。没有 API Key 时可用 `ASR_PROVIDER=fake` 跑通全链路；
+> Deepgram 真实联调需要 `server/.env` 中的 key。
 
 ## 目录
 
@@ -45,13 +45,29 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
 
 ## 运行
 
+先起后端（无 key 时用 fake provider 验证链路）：
+
+```powershell
+cd server
+Copy-Item .env.example .env     # 首次：填入 DEEPGRAM_API_KEY / DEEPL_API_KEY
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+# 没有 key：$env:ASR_PROVIDER = "fake" 后再启动
+```
+
+再起客户端（USB 真机先 `adb reverse tcp:8000 tcp:8000`，客户端默认连 localhost）：
+
 ```powershell
 . .\scripts\env.ps1
 cd client
 flutter pub get
-flutter run -d windows          # 需要 Visual Studio C++ 工具链 + 开发者模式
 flutter run -d <android-id>     # adb devices 查看
+flutter run -d windows          # 需要 Visual Studio C++ 工具链 + 开发者模式
 flutter build apk --debug
+
+# 局域网访问后端（不放行防火墙时用上面的 adb reverse 即可）
+flutter run --dart-define=WS_BASE=ws://192.168.1.20:8000
+# 不连后端、只看 UI：
+flutter run --dart-define=DEMO=true
 ```
 
 > **Windows 桌面端前置条件（需你手动完成）**
@@ -102,7 +118,7 @@ flutter build apk --debug
 | --- | --- | --- |
 | 0 | 环境检查、工具链、待机视频落地 | ✅ |
 | 1 | Flutter 壳、待机视频页、录音页 UI 状态切换 | ✅ |
-| 2 | 16 kHz PCM 采集、WebSocket 代理、Deepgram partial/final | ⏳ |
+| 2 | 16 kHz PCM 采集、WebSocket 代理、Deepgram partial/final | 🟡 代码完成，待 key 联调 |
 | 3 | VAD 静音暂停、300 ms 预缓冲、断线重连 | ⏳ |
 | 4 | 翻译开关 / 目标语言 / DeepL / final-only 缓存 | ⏳ |
 | 5 | 指标日志、README、验收清单、密钥扫描 | ⏳ |

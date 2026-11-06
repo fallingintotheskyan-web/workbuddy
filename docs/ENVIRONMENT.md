@@ -94,6 +94,8 @@ C: 可用 338 GB / 500 GB；工具链与 Gradle 缓存预计占用 5–6 GB。
 7. **GitHub API 403**：MinGit 改从 npmmirror 镜像下载。
 8. **Windows 插件符号链接**：`flutter pub get` 末尾会提示需要开发者模式；Android
    构建不受影响，Windows 构建需要开启。
+9. **PyPI 直连极慢**：`pip install` 从 pypi.org 会长时间卡住（曾 20 分钟无进展）。
+   改用清华镜像 `-i https://pypi.tuna.tsinghua.edu.cn/simple` 后 1 分钟内装完。
 
 ## 8. 需要你完成的两件事（Windows 桌面端）
 

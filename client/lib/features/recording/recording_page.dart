@@ -81,38 +81,38 @@ class _RecordingPageState extends State<RecordingPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Stack(
-        children: <Widget>[
-          const Positioned.fill(child: _RecordingBackground()),
-          SafeArea(
-            child: AnimatedBuilder(
-              animation: _transcript,
-              builder: (BuildContext context, Widget? _) {
-                return Column(
-                  children: <Widget>[
-                    _buildHeader(context),
-                    if (_transcript.error != null) _buildErrorBanner(),
-                    Expanded(
-                      child: Center(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 980),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 22),
-                            child: SubtitleList(
-                              lines: _transcript.lines,
-                              partial: _transcript.partial,
-                            ),
-                          ),
+      body: SafeArea(
+        child: AnimatedBuilder(
+          animation: _transcript,
+          builder: (BuildContext context, Widget? _) {
+            return Column(
+              children: <Widget>[
+                _buildHeader(context),
+                if (_transcript.error != null) _buildErrorBanner(),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(18),
+                        child: SubtitleList(
+                          lines: _transcript.lines,
+                          partial: _transcript.partial,
                         ),
                       ),
                     ),
-                    _buildFooter(context),
-                  ],
-                );
-              },
-            ),
-          ),
-        ],
+                  ),
+                ),
+                _buildFooter(context),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -305,22 +305,5 @@ class _RecordingPageState extends State<RecordingPage> {
     final String minutes = duration.inMinutes.toString().padLeft(2, '0');
     final String seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
     return '$minutes:$seconds';
-  }
-}
-
-class _RecordingBackground extends StatelessWidget {
-  const _RecordingBackground();
-
-  @override
-  Widget build(BuildContext context) {
-    return const DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: RadialGradient(
-          center: Alignment(0, -0.85),
-          radius: 1.25,
-          colors: <Color>[Color(0xFF102830), Color(0xFF071115), Color(0xFF030608)],
-        ),
-      ),
-    );
   }
 }

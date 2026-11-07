@@ -10,8 +10,8 @@ import '../../core/app_config.dart';
 import '../../core/app_theme.dart';
 import '../recording/recording_page.dart';
 
-/// Full-screen idle screen: looping muted video (or a gradient fallback) with a
-/// single call to action.
+/// Idle screen: pure black backdrop, a centered letterboxed video (like a
+/// gallery player), and one large call to action.
 class IdlePage extends StatefulWidget {
   const IdlePage({super.key});
 
@@ -121,41 +121,63 @@ class _IdlePageState extends State<IdlePage> {
     await _player?.play();
   }
 
+  /// The video is shown at its natural aspect ratio, so a 90° override needs a
+  /// portrait box.
+  double get _videoAspect {
+    final int rotation = _config?.rotation ?? 0;
+    return (rotation == 90 || rotation == 270) ? 9 / 16 : 16 / 9;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Stack(
-        fit: StackFit.expand,
-        children: <Widget>[
-          _buildBackground(),
-          const _IdleScrim(),
-          SafeArea(
-            minimum: const EdgeInsets.only(bottom: 8),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 18, 24, 16),
+      body: SafeArea(
+        minimum: const EdgeInsets.only(bottom: 8),
+        child: Column(
+          children: <Widget>[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 18, 24, 10),
+              child: _buildHeader(),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                child: Center(
+                  child: AspectRatio(
+                    aspectRatio: _videoAspect,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: _buildVideoArea(),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
-                  _buildHeader(),
-                  const Spacer(),
-                  if (_error != null) _buildErrorCard(),
-                  const SizedBox(height: 16),
+                  if (_error != null) ...<Widget>[
+                    _buildErrorCard(),
+                    const SizedBox(height: 12),
+                  ],
                   _buildStartButton(),
                 ],
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildBackground() {
+  Widget _buildVideoArea() {
     if (_ready && _controller != null && _error == null) {
       final Video video = Video(
         controller: _controller!,
-        fit: BoxFit.cover,
+        fit: BoxFit.contain,
         fill: Colors.black,
         controls: NoVideoControls,
         wakelock: false,
@@ -173,7 +195,7 @@ class _IdlePageState extends State<IdlePage> {
           width: 44,
           height: 44,
           decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.35),
+            color: Colors.white.withValues(alpha: 0.06),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
           ),
@@ -242,13 +264,13 @@ class _IdlePageState extends State<IdlePage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             SizedBox(
-              height: 58,
+              height: 64,
               child: FilledButton.icon(
                 onPressed: _startRecording,
-                icon: const Icon(Icons.mic_rounded, size: 24),
+                icon: const Icon(Icons.mic_rounded, size: 26),
                 label: const Text(
                   '开始录音',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, letterSpacing: 1),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: 1),
                 ),
                 style: FilledButton.styleFrom(
                   backgroundColor: AppTheme.accent,
@@ -270,28 +292,6 @@ class _IdlePageState extends State<IdlePage> {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _IdleScrim extends StatelessWidget {
-  const _IdleScrim();
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: <Color>[
-            Colors.black.withValues(alpha: 0.55),
-            Colors.black.withValues(alpha: 0.10),
-            Colors.black.withValues(alpha: 0.78),
-          ],
-          stops: const <double>[0, 0.45, 1],
         ),
       ),
     );

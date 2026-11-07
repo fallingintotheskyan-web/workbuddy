@@ -202,18 +202,6 @@ class _IdlePageState extends State<IdlePage> {
           ],
         ),
         const Spacer(),
-        if (useDemoSession)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Text(
-              '演示数据',
-              style: TextStyle(fontSize: 11, color: Colors.white70),
-            ),
-          ),
       ],
     );
   }

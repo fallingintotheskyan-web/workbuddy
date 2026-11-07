@@ -13,15 +13,6 @@ const String kWsBaseUrl = String.fromEnvironment(
   defaultValue: 'ws://127.0.0.1:8000',
 );
 
-/// `--dart-define=DEMO=true` switches to the scripted transcript so the UI can
-/// be demoed without a backend or microphone.
-///
-/// Web uses the real recording session too: the `record` plugin's web backend
-/// (`record_web`) captures 16 kHz mono PCM16 through an AudioWorklet.
-const bool kUseDemoSession = bool.fromEnvironment('DEMO', defaultValue: false);
-
-bool get useDemoSession => kUseDemoSession;
-
 /// `ws(s)://host:port/ws/asr`
 Uri get asrEndpoint {
   final String base =

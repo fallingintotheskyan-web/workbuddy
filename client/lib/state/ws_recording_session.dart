@@ -75,7 +75,9 @@ class WsRecordingSession implements RecordingSession {
 
     final bool granted = await _capture.hasPermission();
     if (!granted) {
-      _fail('麦克风权限被拒绝，请在系统设置中允许录音后重试。');
+      _fail(kIsWeb
+          ? '麦克风权限被拒绝：请点击浏览器地址栏左侧的麦克风图标，允许本站访问麦克风后重试。'
+          : '麦克风权限被拒绝，请在系统设置中允许录音后重试。');
       return;
     }
 

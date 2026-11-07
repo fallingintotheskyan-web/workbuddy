@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import '../../core/app_config.dart';
 import '../../core/app_theme.dart';
 import '../../models/language.dart';
-import '../../state/demo_session.dart';
 import '../../state/recording_session.dart';
 import '../../state/transcript_controller.dart';
 import '../../state/ws_recording_session.dart';
@@ -33,9 +32,7 @@ class _RecordingPageState extends State<RecordingPage> {
   void initState() {
     super.initState();
     _transcript = TranscriptController();
-    _session = useDemoSession
-        ? DemoRecordingSession()
-        : WsRecordingSession(endpoint: asrEndpoint);
+    _session = WsRecordingSession(endpoint: asrEndpoint);
     _subscription = _session.events.listen(_transcript.apply);
     _session.updateTranslation(
       enabled: _transcript.translateEnabled,
@@ -134,7 +131,6 @@ class _RecordingPageState extends State<RecordingPage> {
               StatusChip(status: _transcript.status),
               _buildSourceLanguageDropdown(),
               _buildTranslateToggle(),
-              if (useDemoSession) const _DemoBadge(),
             ],
           ),
           const SizedBox(height: 10),
@@ -309,25 +305,6 @@ class _RecordingPageState extends State<RecordingPage> {
     final String minutes = duration.inMinutes.toString().padLeft(2, '0');
     final String seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
     return '$minutes:$seconds';
-  }
-}
-
-class _DemoBadge extends StatelessWidget {
-  const _DemoBadge();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        '演示数据',
-        style: TextStyle(fontSize: 10.5, color: Colors.white.withValues(alpha: 0.55)),
-      ),
-    );
   }
 }
 

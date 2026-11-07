@@ -36,3 +36,6 @@ server/pip-*
 server/last_result.json
 server/tools/selftest_*.wav
 server/tools/selftest_*.pcm
+
+# Submission package (deliverable, not source)
+submission/

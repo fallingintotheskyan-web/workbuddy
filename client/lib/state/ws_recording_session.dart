@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:typed_data';
+
+import 'package:flutter/foundation.dart';
 
 import '../audio/audio_capture.dart';
 import '../audio/preroll_buffer.dart';
@@ -48,6 +49,8 @@ class WsRecordingSession implements RecordingSession {
   bool _translationEnabled = false;
   TargetLanguage _target = TargetLanguage.english;
   SourceLanguage _source = SourceLanguage.auto;
+  int _capturedBytes = 0;
+  int _sentBytes = 0;
 
   @override
   Stream<SessionEvent> get events => _events.stream;
@@ -104,6 +107,12 @@ class WsRecordingSession implements RecordingSession {
     _messageSubscription = null;
     await _client?.close();
     _client = null;
+    final double capturedSeconds = _capturedBytes / 32000;
+    final double sentSeconds = _sentBytes / 32000;
+    debugPrint(
+      'session metrics: captured=${capturedSeconds.toStringAsFixed(1)}s '
+      'asrSent=${sentSeconds.toStringAsFixed(1)}s',
+    );
     _emit(const StatusEvent(SessionStatus.idle));
   }
 
@@ -127,6 +136,7 @@ class WsRecordingSession implements RecordingSession {
   }
 
   void _onAudio(Uint8List chunk) {
+    _capturedBytes += chunk.length;
     final AsrWsClient? client = _client;
     if (client == null) {
       // Transport is down and reconnect is in flight; keep a little audio.
@@ -141,8 +151,12 @@ class WsRecordingSession implements RecordingSession {
         _pausedBySilence = false;
         _emit(const StatusEvent(SessionStatus.listening));
         final Uint8List pre = _prebuffer.drain();
-        if (pre.isNotEmpty) client.sendAudio(pre);
+        if (pre.isNotEmpty) {
+          _sentBytes += pre.length;
+          client.sendAudio(pre);
+        }
       }
+      _sentBytes += chunk.length;
       client.sendAudio(chunk);
       _prebuffer.add(chunk);
     } else {

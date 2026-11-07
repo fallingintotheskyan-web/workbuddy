@@ -3,8 +3,8 @@
 课堂实时录音 → 流式字幕 → 可选翻译的跨平台 App。Flutter 客户端（Android / Windows），
 FastAPI 负责代理 ASR 与翻译，密钥只存在后端 `.env`。
 
-> 当前进度：**阶段 4 已完成**（翻译开关、目标语言切换、DeepL final-only 翻译 + 缓存、译文 UI）。
-> Deepgram / DeepL 均已用真实 key 端到端自测通过。阶段 5 收尾（指标日志、README、验收清单、密钥扫描）。
+> 当前进度：**全部 5 个阶段已完成**（UI / 采集与 ASR / VAD 与重连 / 翻译 / 指标与验收）。
+> Deepgram、DeepL 均已用真实 key 端到端自测通过。Windows 桌面构建还差开发者模式一项。
 
 ## 目录
 
@@ -108,8 +108,15 @@ flutter run --dart-define=DEMO=true
 ## 安全
 
 - 密钥仅存于 `server/.env`（已 gitignore）。
-- 仓库内提供密钥扫描脚本（阶段 5 固化到验收流程）。
+- 密钥扫描：`pwsh -ExecutionPolicy Bypass -File scripts\check_no_secrets.ps1`
 - 手机连本机后端推荐 `adb reverse tcp:8000 tcp:8000`，避免 Windows 防火墙放行。
+
+## 日志与指标
+
+- 服务端每 10 s 推一次 `metrics` 事件，并在会话结束时打印一行摘要：
+  `duration / audio_s / asr_sent_s / partials / finals / translate_calls / translate_chars`。
+- 客户端停止录音时打印 `captured / asrSent`（麦克风原始秒数 vs 实际送 ASR 秒数，差值为 VAD 省下的静音）。
+- 完整验收清单见 [docs/ACCEPTANCE.md](docs/ACCEPTANCE.md)。
 
 ## 阶段计划
 
@@ -120,7 +127,7 @@ flutter run --dart-define=DEMO=true
 | 2 | 16 kHz PCM 采集、WebSocket 代理、Deepgram partial/final | ✅ |
 | 3 | VAD 静音暂停、300 ms 预缓冲、断线重连 | ✅ |
 | 4 | 翻译开关 / 目标语言 / DeepL / final-only 缓存 | ✅ |
-| 5 | 指标日志、README、验收清单、密钥扫描 | ⏳ |
+| 5 | 指标日志、README、验收清单、密钥扫描 | ✅ |
 
 ## 已知限制
 

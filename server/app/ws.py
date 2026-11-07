@@ -23,6 +23,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time
 import uuid
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
@@ -56,8 +57,14 @@ class AsrConnection:
         self.translate_target = "en"
         self._translate_tasks: list[asyncio.Task[None]] = []
         self.pump: asyncio.Task[None] | None = None
+        self.metrics_task: asyncio.Task[None] | None = None
+        self.started_at = time.monotonic()
         self.sequence = 0
         self.audio_bytes = 0
+        self.partials = 0
+        self.finals = 0
+        self.translate_calls = 0
+        self.translate_chars = 0
         self.language = settings.asr_default_language
 
     async def run(self) -> None:
@@ -80,6 +87,7 @@ class AsrConnection:
                 }
             )
             self.pump = asyncio.create_task(self._pump_events(), name=f"asr-pump-{self.session_id}")
+            self.metrics_task = asyncio.create_task(self._metrics_loop(), name=f"metrics-{self.session_id}")
             await self._receive_loop()
         except ProtocolError as exc:
             await self._safe_error(str(exc))
@@ -162,9 +170,11 @@ class AsrConnection:
         try:
             async for event in self.provider.events():
                 if event.type == AsrEventType.PARTIAL:
+                    self.partials += 1
                     await self._send({"type": "partial", "text": event.text})
                 elif event.type == AsrEventType.FINAL:
                     self.sequence += 1
+                    self.finals += 1
                     final_id = f"{self.session_id}-{self.sequence}"
                     await self._send(
                         {
@@ -203,6 +213,8 @@ class AsrConnection:
         assert self.translator is not None
         try:
             translation = await self.translator.translate(text, target)
+            self.translate_calls += 1
+            self.translate_chars += len(translation)
             if translation:
                 await self._send(
                     {
@@ -215,6 +227,43 @@ class AsrConnection:
         except Exception as exc:  # noqa: BLE001 - translation is best effort
             logger.warning("translation failed for %s: %s", final_id, exc)
 
+    async def _metrics_loop(self) -> None:
+        try:
+            while True:
+                await asyncio.sleep(10)
+                await self._send(self._metrics_payload())
+        except asyncio.CancelledError:
+            raise
+
+    def _metrics_payload(self) -> dict:
+        seconds = round(self.audio_bytes / (SAMPLE_RATE * 2), 1)
+        return {
+            "type": "metrics",
+            "sessionId": self.session_id,
+            "durationSeconds": round(time.monotonic() - self.started_at, 1),
+            "audioSeconds": seconds,
+            "asrSentSeconds": seconds,
+            "partials": self.partials,
+            "finals": self.finals,
+            "translateCalls": self.translate_calls,
+            "translateChars": self.translate_chars,
+        }
+
+    def _log_summary(self) -> None:
+        metrics = self._metrics_payload()
+        logger.info(
+            "session=%s duration=%.1fs audio_s=%.1f asr_sent_s=%.1f partials=%d finals=%d "
+            "translate_calls=%d translate_chars=%d",
+            self.session_id,
+            metrics["durationSeconds"],
+            metrics["audioSeconds"],
+            metrics["asrSentSeconds"],
+            metrics["partials"],
+            metrics["finals"],
+            metrics["translateCalls"],
+            metrics["translateChars"],
+        )
+
     async def _safe_error(self, message: str) -> None:
         await self._send({"type": "error", "message": message})
 
@@ -224,6 +273,13 @@ class AsrConnection:
         if self._translate_tasks:
             await asyncio.gather(*self._translate_tasks, return_exceptions=True)
         self._translate_tasks.clear()
+        if self.metrics_task is not None:
+            self.metrics_task.cancel()
+            try:
+                await self.metrics_task
+            except (asyncio.CancelledError, Exception):  # noqa: BLE001
+                pass
+        self._log_summary()
         if self.pump is not None:
             self.pump.cancel()
             try:

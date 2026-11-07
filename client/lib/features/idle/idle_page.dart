@@ -202,7 +202,7 @@ class _IdlePageState extends State<IdlePage> {
           ],
         ),
         const Spacer(),
-        if (kUseDemoSession)
+        if (useDemoSession)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
@@ -210,7 +210,7 @@ class _IdlePageState extends State<IdlePage> {
               borderRadius: BorderRadius.circular(20),
             ),
             child: const Text(
-              '阶段 1 · 演示',
+              '演示数据',
               style: TextStyle(fontSize: 11, color: Colors.white70),
             ),
           ),

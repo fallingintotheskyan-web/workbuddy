@@ -33,7 +33,7 @@ class _RecordingPageState extends State<RecordingPage> {
   void initState() {
     super.initState();
     _transcript = TranscriptController();
-    _session = kUseDemoSession
+    _session = useDemoSession
         ? DemoRecordingSession()
         : WsRecordingSession(endpoint: asrEndpoint);
     _subscription = _session.events.listen(_transcript.apply);
@@ -134,7 +134,7 @@ class _RecordingPageState extends State<RecordingPage> {
               StatusChip(status: _transcript.status),
               _buildSourceLanguageDropdown(),
               _buildTranslateToggle(),
-              if (kUseDemoSession) const _DemoBadge(),
+              if (useDemoSession) const _DemoBadge(),
             ],
           ),
           const SizedBox(height: 10),

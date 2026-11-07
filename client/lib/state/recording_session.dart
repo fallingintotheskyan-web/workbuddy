@@ -49,7 +49,9 @@ abstract class RecordingSession {
 
   Future<void> start({required SourceLanguage source});
 
-  Future<void> stop();
+  /// Stops the session and returns the absolute path of the saved recording,
+  /// or null when no recording was produced.
+  Future<String?> stop();
 
   void updateTranslation({required bool enabled, required TargetLanguage target});
 

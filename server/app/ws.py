@@ -156,6 +156,11 @@ class AsrConnection:
                     target = str(translate.get("target", "en")).lower()
                     if target in {"zh", "en", "ru"}:
                         self.translate_target = target
+                    logger.info(
+                        "translation config enabled=%s target=%s",
+                        self.translate_enabled,
+                        self.translate_target,
+                    )
             elif kind == "stop":
                 await self.provider.flush()
                 await asyncio.sleep(0.05)
@@ -211,6 +216,7 @@ class AsrConnection:
 
     async def _translate_and_send(self, final_id: str, text: str, target: str) -> None:
         assert self.translator is not None
+        logger.info("translating id=%s target=%s chars=%d", final_id, target, len(text))
         try:
             translation = await self.translator.translate(text, target)
             self.translate_calls += 1

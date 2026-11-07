@@ -12,10 +12,20 @@ enum IdleVideoType { asset, url }
 /// { "type": "url",   "value": "https://example.com/loop.mp4" }
 /// ```
 class IdleVideoConfig {
-  const IdleVideoConfig({required this.type, required this.value});
+  const IdleVideoConfig({
+    required this.type,
+    required this.value,
+    this.rotation = 0,
+  });
 
   final IdleVideoType type;
   final String value;
+
+  /// Forced clockwise rotation in degrees: 0 / 90 / 180 / 270. Used to correct
+  /// sources whose frames are stored sideways with no rotation metadata.
+  final int rotation;
+
+  int get quarterTurns => rotation ~/ 90;
 
   static const IdleVideoConfig fallback = IdleVideoConfig(
     type: IdleVideoType.asset,
@@ -41,14 +51,28 @@ class IdleVideoConfig {
       if (value == null || value.isEmpty) return null;
       final String? type = (decoded['type'] as String?)?.trim().toLowerCase();
 
-      return switch (type) {
-        'url' => IdleVideoConfig(type: IdleVideoType.url, value: value),
-        'asset' || null || '' => IdleVideoConfig(type: IdleVideoType.asset, value: value),
+      final IdleVideoType? videoType = switch (type) {
+        'url' => IdleVideoType.url,
+        'asset' || null || '' => IdleVideoType.asset,
         _ => null,
       };
+      if (videoType == null) return null;
+
+      final int rotation = _parseRotation(decoded['rotation']);
+
+      return IdleVideoConfig(type: videoType, value: value, rotation: rotation);
     } catch (_) {
       return null;
     }
+  }
+
+  static int _parseRotation(Object? value) {
+    final int parsed = switch (value) {
+      int v => v,
+      String s => int.tryParse(s) ?? 0,
+      _ => 0,
+    };
+    return const <int>[0, 90, 180, 270].contains(parsed) ? parsed : 0;
   }
 
   bool get isAsset => type == IdleVideoType.asset;

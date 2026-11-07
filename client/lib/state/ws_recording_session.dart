@@ -2,9 +2,11 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../audio/audio_capture.dart';
 import '../audio/preroll_buffer.dart';
+import '../audio/recording_store.dart';
 import '../audio/vad.dart';
 import '../models/language.dart';
 import '../models/session_status.dart';
@@ -14,12 +16,13 @@ import 'recording_session.dart';
 
 /// Real session: microphone PCM -> WebSocket -> ASR proxy -> partial/final.
 ///
-/// Phase 3 additions over phase 2:
-///  - VAD stops sending during ~1.5 s of silence and sends `flush` to lock the
-///    current sentence;
-///  - a 300 ms pre-roll buffer is replayed when speech resumes so the first
-///    syllable is not swallowed;
-///  - transport drops trigger exponential-backoff reconnects.
+/// - VAD stops sending during ~1.5 s of silence and sends `flush` to lock the
+///   current sentence;
+/// - a 300 ms pre-roll buffer is replayed when speech resumes (and after the
+///   socket connects) so the first syllable is not swallowed;
+/// - transport drops trigger exponential-backoff reconnects;
+/// - the raw microphone stream is written to a WAV file in the app sandbox and
+///   returned on [stop].
 class WsRecordingSession implements RecordingSession {
   WsRecordingSession({
     required this.endpoint,
@@ -34,6 +37,7 @@ class WsRecordingSession implements RecordingSession {
   final AudioCapture _capture;
   final VoiceActivityDetector _vad;
   final PreRollBuffer _prebuffer = PreRollBuffer(durationMs: 300);
+  final RecordingStore _store = RecordingStore();
   final StreamController<SessionEvent> _events = StreamController<SessionEvent>.broadcast();
 
   AsrWsClient? _client;
@@ -63,6 +67,8 @@ class WsRecordingSession implements RecordingSession {
     _pausedBySilence = false;
     _reconnectAttempts = 0;
     _reconnecting = false;
+    _capturedBytes = 0;
+    _sentBytes = 0;
     _vad.reset();
     _prebuffer.clear();
     _emit(const StatusEvent(SessionStatus.connecting));
@@ -73,13 +79,29 @@ class WsRecordingSession implements RecordingSession {
       return;
     }
 
+    // Recording is best-effort; it must never block live transcription.
     try {
-      await _connect();
+      final docs = await getApplicationDocumentsDirectory();
+      await _store.start('${docs.path}/recordings');
+    } catch (error) {
+      debugPrint('recording store init failed: $error');
+    }
+
+    try {
+      // Start capture first and buffer it, so no audio is lost while the
+      // socket connects. The buffered audio is replayed once connected.
       final Stream<Uint8List> audio = await _capture.start();
       _audioSubscription = audio.listen(
         _onAudio,
         onError: (Object error) => _fail('音频采集失败：$error'),
       );
+
+      await _connect();
+      final Uint8List pre = _prebuffer.drain();
+      if (pre.isNotEmpty && _client != null) {
+        _sentBytes += pre.length;
+        _client!.sendAudio(pre);
+      }
       _emit(const StatusEvent(SessionStatus.listening));
     } catch (error) {
       _fail('无法连接识别服务（$endpoint）：$error');
@@ -94,8 +116,8 @@ class WsRecordingSession implements RecordingSession {
   }
 
   @override
-  Future<void> stop() async {
-    if (!_running) return;
+  Future<String?> stop() async {
+    if (!_running) return null;
     _running = false;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
@@ -107,13 +129,18 @@ class WsRecordingSession implements RecordingSession {
     _messageSubscription = null;
     await _client?.close();
     _client = null;
+
+    final String? savedPath = await _store.finalize();
+
     final double capturedSeconds = _capturedBytes / 32000;
     final double sentSeconds = _sentBytes / 32000;
     debugPrint(
       'session metrics: captured=${capturedSeconds.toStringAsFixed(1)}s '
       'asrSent=${sentSeconds.toStringAsFixed(1)}s',
     );
+
     _emit(const StatusEvent(SessionStatus.idle));
+    return savedPath;
   }
 
   @override
@@ -137,6 +164,8 @@ class WsRecordingSession implements RecordingSession {
 
   void _onAudio(Uint8List chunk) {
     _capturedBytes += chunk.length;
+    _store.write(chunk);
+
     final AsrWsClient? client = _client;
     if (client == null) {
       // Transport is down and reconnect is in flight; keep a little audio.
@@ -204,6 +233,7 @@ class WsRecordingSession implements RecordingSession {
         await _connect();
         final Uint8List pre = _prebuffer.drain();
         if (pre.isNotEmpty && _client != null) {
+          _sentBytes += pre.length;
           _client!.sendAudio(pre);
         }
         _emit(StatusEvent(_vad.isSpeaking ? SessionStatus.listening : SessionStatus.paused));

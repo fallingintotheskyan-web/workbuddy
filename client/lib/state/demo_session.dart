@@ -65,10 +65,11 @@ class DemoRecordingSession implements RecordingSession {
   }
 
   @override
-  Future<void> stop() async {
-    if (!_running) return;
+  Future<String?> stop() async {
+    if (!_running) return null;
     _running = false;
     _emit(const StatusEvent(SessionStatus.idle));
+    return null;
   }
 
   @override

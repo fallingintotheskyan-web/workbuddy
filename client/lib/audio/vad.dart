@@ -1,51 +1,54 @@
 import 'dart:math' as math;
 import 'dart:typed_data';
 
-/// Energy-based voice activity detector over 20 ms frames.
+/// Energy-based voice activity detector.
 ///
-/// The noise floor adapts slowly so it works in rooms whose background level
-/// drifts. Speech must stay above the threshold for [minSpeechMs] to start, and
-/// silence must last [silenceHoldMs] to stop — the hangover avoids chopping
-/// sentences at short pauses.
+/// Audio is 16 kHz / mono / s16le (32 000 bytes per second), but the capture
+/// plugin delivers variable-size chunks, so all timing is computed from the
+/// byte count instead of assuming a fixed frame size. This is what made silence
+/// detection sluggish on real devices: a 128 ms chunk was counted as one
+/// "20 ms" frame.
 class VoiceActivityDetector {
   VoiceActivityDetector({
-    this.frameMs = 20,
+    this.minSpeechMs = 100,
     this.silenceHoldMs = 1500,
-    this.minSpeechMs = 120,
-    this.initialNoiseFloor = 400.0,
+    this.initialNoiseFloor = 250.0,
   }) : _noiseFloor = initialNoiseFloor;
 
-  final int frameMs;
-  final int silenceHoldMs;
   final int minSpeechMs;
+  final int silenceHoldMs;
   final double initialNoiseFloor;
 
   double _noiseFloor;
-  int _voicedFrames = 0;
-  int _silentFrames = 0;
+  double _speechMs = 0;
+  double _silenceMs = 0;
   bool _speaking = false;
 
   bool get isSpeaking => _speaking;
 
-  /// Feed one PCM frame (16-bit little-endian mono) and return the new state.
+  /// Feed one PCM chunk (16-bit little-endian mono) and return the new state.
   bool processFrame(Uint8List pcm) {
     final double rms = _rms(pcm);
     _adaptNoiseFloor(rms);
 
-    // Room for a meaningful dynamic range without triggering on tiny noise.
-    final double threshold = _noiseFloor * 2.0 + 150.0;
+    // Track the noise floor with a margin and a floor, so normal speech trips
+    // even on quiet microphones without firing on background hiss.
+    final double threshold = math.max(_noiseFloor * 1.8 + 100.0, 350.0);
     final bool voiced = rms > threshold;
 
+    // 32 000 bytes/s => 32 bytes/ms.
+    final double chunkMs = pcm.length / 32.0;
+
     if (voiced) {
-      _voicedFrames++;
-      _silentFrames = 0;
-      if (!_speaking && _voicedFrames * frameMs >= minSpeechMs) {
+      _speechMs += chunkMs;
+      _silenceMs = 0;
+      if (!_speaking && _speechMs >= minSpeechMs) {
         _speaking = true;
       }
     } else {
-      _silentFrames++;
-      _voicedFrames = 0;
-      if (_speaking && _silentFrames * frameMs >= silenceHoldMs) {
+      _silenceMs += chunkMs;
+      _speechMs = 0;
+      if (_speaking && _silenceMs >= silenceHoldMs) {
         _speaking = false;
       }
     }
@@ -54,8 +57,8 @@ class VoiceActivityDetector {
 
   void reset() {
     _noiseFloor = initialNoiseFloor;
-    _voicedFrames = 0;
-    _silentFrames = 0;
+    _speechMs = 0;
+    _silenceMs = 0;
     _speaking = false;
   }
 

@@ -1,4 +1,5 @@
 {
   "type": "asset",
-  "value": "assets/idle/idle_loop.mp4"
+  "value": "assets/idle/idle_loop.mp4",
+  "rotation": 0
 }

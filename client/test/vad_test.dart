@@ -58,4 +58,19 @@ void main() {
     vad.reset();
     expect(vad.isSpeaking, isFalse);
   });
+
+  test('large chunks are timed by bytes, not by a fixed 20 ms frame', () {
+    final VoiceActivityDetector vad =
+        VoiceActivityDetector(minSpeechMs: 100, silenceHoldMs: 400);
+
+    // One 128 ms (4096-byte) loud chunk must be enough speech to start.
+    vad.processFrame(_frame(3000, samples: 2048));
+    expect(vad.isSpeaking, isTrue);
+
+    // Four 128 ms silence chunks (512 ms total) must drop the hangover.
+    for (int i = 0; i < 4; i++) {
+      vad.processFrame(_frame(0, samples: 2048));
+    }
+    expect(vad.isSpeaking, isFalse);
+  });
 }

@@ -15,6 +15,11 @@ $env:GRADLE_USER_HOME = Join-Path $TC 'gradle'
 # user.home from the OS profile, so point the SDK tools at a workspace folder.
 $env:ANDROID_USER_HOME = Join-Path $TC 'state\Android'
 
+# adb's child process cannot write to %USERPROFILE%\.android under the sandbox,
+# so keep the debug key inside the workspace and tell adb to use it.
+$adbKey = Join-Path $TC 'adbkey'
+if (Test-Path $adbKey) { $env:ADB_VENDOR_KEYS = $adbKey }
+
 # Flutter/Dart/Gradle write user state outside the repo by default, which the
 # file sandbox blocks. Keep all of it under .toolchains/state instead.
 $state = Join-Path $TC 'state'

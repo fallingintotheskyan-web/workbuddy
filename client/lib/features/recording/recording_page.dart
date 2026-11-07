@@ -75,9 +75,9 @@ class _RecordingPageState extends State<RecordingPage> {
   Future<void> _stop() async {
     if (_stopping) return;
     _stopping = true;
-    await _session.stop();
+    final String? savedPath = await _session.stop();
     if (!mounted) return;
-    Navigator.of(context).pop();
+    Navigator.of(context).pop(savedPath);
   }
 
   @override

@@ -23,6 +23,7 @@ class _IdlePageState extends State<IdlePage> {
   Player? _player;
   VideoController? _controller;
   StreamSubscription<String>? _errorSubscription;
+  IdleVideoConfig? _config;
   String? _error;
   bool _ready = false;
   bool _initializing = true;
@@ -51,6 +52,7 @@ class _IdlePageState extends State<IdlePage> {
 
     final IdleVideoConfig config = await IdleVideoConfig.load();
     if (!mounted) return;
+    _config = config;
 
     // Fail fast with a readable message when the bundled asset is missing.
     if (config.isAsset) {
@@ -107,10 +109,15 @@ class _IdlePageState extends State<IdlePage> {
   Future<void> _startRecording() async {
     await _player?.pause();
     if (!mounted) return;
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(builder: (_) => const RecordingPage()),
+    final String? savedPath = await Navigator.of(context).push<String>(
+      MaterialPageRoute<String>(builder: (_) => const RecordingPage()),
     );
     if (!mounted) return;
+    if (savedPath != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('录音已保存至：$savedPath')),
+      );
+    }
     await _player?.play();
   }
 
@@ -146,13 +153,15 @@ class _IdlePageState extends State<IdlePage> {
 
   Widget _buildBackground() {
     if (_ready && _controller != null && _error == null) {
-      return Video(
+      final Video video = Video(
         controller: _controller!,
         fit: BoxFit.cover,
         fill: Colors.black,
         controls: NoVideoControls,
         wakelock: false,
       );
+      final int turns = _config?.quarterTurns ?? 0;
+      return turns == 0 ? video : RotatedBox(quarterTurns: turns, child: video);
     }
     return const _GradientFallback();
   }

@@ -3,9 +3,8 @@
 课堂实时录音 → 流式字幕 → 可选翻译的跨平台 App。Flutter 客户端（Android / Windows），
 FastAPI 负责代理 ASR 与翻译，密钥只存在后端 `.env`。
 
-> 当前进度：**阶段 2 代码完成**（16 kHz PCM 采集、WebSocket 代理、Deepgram 适配器、
-> partial/final 字幕闭环）。没有 API Key 时可用 `ASR_PROVIDER=fake` 跑通全链路；
-> Deepgram 真实联调需要 `server/.env` 中的 key。
+> 当前进度：**阶段 3 已完成**（VAD 静音暂停、300 ms 预缓冲、flush 锁定、断线重连）。
+> Deepgram / DeepL 均已用真实 key 自测通过。阶段 4 接入翻译。
 
 ## 目录
 
@@ -118,8 +117,8 @@ flutter run --dart-define=DEMO=true
 | --- | --- | --- |
 | 0 | 环境检查、工具链、待机视频落地 | ✅ |
 | 1 | Flutter 壳、待机视频页、录音页 UI 状态切换 | ✅ |
-| 2 | 16 kHz PCM 采集、WebSocket 代理、Deepgram partial/final | 🟡 代码完成，待 key 联调 |
-| 3 | VAD 静音暂停、300 ms 预缓冲、断线重连 | ⏳ |
+| 2 | 16 kHz PCM 采集、WebSocket 代理、Deepgram partial/final | ✅ |
+| 3 | VAD 静音暂停、300 ms 预缓冲、断线重连 | ✅ |
 | 4 | 翻译开关 / 目标语言 / DeepL / final-only 缓存 | ⏳ |
 | 5 | 指标日志、README、验收清单、密钥扫描 | ⏳ |
 

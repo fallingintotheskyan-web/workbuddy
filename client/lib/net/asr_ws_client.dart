@@ -6,8 +6,9 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 
 /// Thin WebSocket transport for the ASR proxy.
 ///
-/// It only moves text control messages and binary PCM frames; protocol parsing
-/// lives in `asr_protocol.dart` and session state lives in `WsRecordingSession`.
+/// Transport failures are surfaced as a `__closed` message so the session can
+/// distinguish them from server-level `error` messages (which must not trigger
+/// a reconnect).
 class AsrWsClient {
   AsrWsClient({required this.endpoint, this.connectTimeout = const Duration(seconds: 8)});
 
@@ -23,40 +24,57 @@ class AsrWsClient {
 
   Future<void> connect() async {
     final WebSocketChannel channel = WebSocketChannel.connect(endpoint);
-    await channel.ready.timeout(connectTimeout);
+    try {
+      await channel.ready.timeout(connectTimeout);
+    } catch (_) {
+      try {
+        await channel.sink.close();
+      } catch (_) {}
+      rethrow;
+    }
     _channel = channel;
     _subscription = channel.stream.listen(
       (dynamic data) {
         if (data is! String) return;
         try {
           final Object? decoded = jsonDecode(data);
-          if (decoded is Map<String, dynamic>) _messages.add(decoded);
+          if (decoded is Map<String, dynamic>) _add(decoded);
         } catch (_) {
           // Ignore malformed frames; the server is the only writer.
         }
       },
-      onError: (Object error) {
-        _messages.add(<String, dynamic>{'type': 'error', 'message': error.toString()});
-      },
-      onDone: () {
-        _messages.add(<String, dynamic>{'type': 'error', 'message': '连接已断开'});
-      },
+      onError: (Object error) => _add(<String, dynamic>{'type': '__closed', 'message': error.toString()}),
+      onDone: () => _add(<String, dynamic>{'type': '__closed', 'message': '连接已断开'}),
     );
   }
 
   void sendJson(Map<String, dynamic> payload) {
-    _channel?.sink.add(jsonEncode(payload));
+    try {
+      _channel?.sink.add(jsonEncode(payload));
+    } catch (_) {
+      // Channel closed mid-flight; the onDone handler drives reconnect.
+    }
   }
 
   void sendAudio(Uint8List bytes) {
-    _channel?.sink.add(bytes);
+    try {
+      _channel?.sink.add(bytes);
+    } catch (_) {
+      // Channel closed mid-flight; the onDone handler drives reconnect.
+    }
   }
 
   Future<void> close() async {
     await _subscription?.cancel();
     _subscription = null;
-    await _channel?.sink.close();
+    try {
+      await _channel?.sink.close();
+    } catch (_) {}
     _channel = null;
-    await _messages.close();
+    if (!_messages.isClosed) await _messages.close();
+  }
+
+  void _add(Map<String, dynamic> message) {
+    if (!_messages.isClosed) _messages.add(message);
   }
 }

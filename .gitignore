@@ -31,3 +31,8 @@ client/android/build/
 
 # pip leftovers
 server/pip-*
+
+# generated self-test artifacts
+server/last_result.json
+server/tools/selftest_*.wav
+server/tools/selftest_*.pcm

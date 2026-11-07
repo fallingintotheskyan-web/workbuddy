@@ -30,6 +30,8 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from .asr.base import AsrEventType, AsrProvider
 from .asr.factory import create_asr_provider
 from .config import settings
+from .translate.base import TranslateProvider
+from .translate.factory import create_translate_provider
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -49,6 +51,10 @@ class AsrConnection:
         self.websocket = websocket
         self.session_id = uuid.uuid4().hex[:12]
         self.provider: AsrProvider | None = None
+        self.translator: TranslateProvider | None = None
+        self.translate_enabled = False
+        self.translate_target = "en"
+        self._translate_tasks: list[asyncio.Task[None]] = []
         self.pump: asyncio.Task[None] | None = None
         self.sequence = 0
         self.audio_bytes = 0
@@ -61,6 +67,7 @@ class AsrConnection:
             self._handle_start(start)
 
             self.provider = create_asr_provider()
+            self.translator = create_translate_provider()
             await self.provider.open(language=self.language)
             await self._send(
                 {
@@ -135,8 +142,12 @@ class AsrConnection:
             if kind == "flush":
                 await self.provider.flush()
             elif kind == "configure":
-                # Translation toggles are handled in phase 4.
-                continue
+                translate = payload.get("translate")
+                if isinstance(translate, dict):
+                    self.translate_enabled = bool(translate.get("enabled"))
+                    target = str(translate.get("target", "en")).lower()
+                    if target in {"zh", "en", "ru"}:
+                        self.translate_target = target
             elif kind == "stop":
                 await self.provider.flush()
                 await asyncio.sleep(0.05)
@@ -154,14 +165,27 @@ class AsrConnection:
                     await self._send({"type": "partial", "text": event.text})
                 elif event.type == AsrEventType.FINAL:
                     self.sequence += 1
+                    final_id = f"{self.session_id}-{self.sequence}"
                     await self._send(
                         {
                             "type": "final",
-                            "id": f"{self.session_id}-{self.sequence}",
+                            "id": final_id,
                             "text": event.text,
                             "seq": self.sequence,
                         }
                     )
+                    # Translate final sentences only, and only when enabled.
+                    if (
+                        self.translate_enabled
+                        and self.translator is not None
+                        and event.text.strip()
+                    ):
+                        self._translate_tasks.append(
+                            asyncio.create_task(
+                                self._translate_and_send(final_id, event.text, self.translate_target),
+                                name=f"translate-{final_id}",
+                            )
+                        )
                 elif event.type == AsrEventType.ERROR:
                     await self._send({"type": "error", "message": event.text})
         except asyncio.CancelledError:
@@ -175,10 +199,31 @@ class AsrConnection:
         except (RuntimeError, WebSocketDisconnect):
             pass
 
+    async def _translate_and_send(self, final_id: str, text: str, target: str) -> None:
+        assert self.translator is not None
+        try:
+            translation = await self.translator.translate(text, target)
+            if translation:
+                await self._send(
+                    {
+                        "type": "translation",
+                        "id": final_id,
+                        "text": translation,
+                        "target": target,
+                    }
+                )
+        except Exception as exc:  # noqa: BLE001 - translation is best effort
+            logger.warning("translation failed for %s: %s", final_id, exc)
+
     async def _safe_error(self, message: str) -> None:
         await self._send({"type": "error", "message": message})
 
     async def _shutdown(self) -> None:
+        for task in self._translate_tasks:
+            task.cancel()
+        if self._translate_tasks:
+            await asyncio.gather(*self._translate_tasks, return_exceptions=True)
+        self._translate_tasks.clear()
         if self.pump is not None:
             self.pump.cancel()
             try:

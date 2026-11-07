@@ -1,8 +1,6 @@
 /// App-wide constants that are expected to change between delivery phases.
 library;
 
-import 'package:flutter/foundation.dart' show kIsWeb;
-
 const String kAppName = '课堂速记';
 
 /// Backend base URL. On a USB-connected Android device use
@@ -15,13 +13,14 @@ const String kWsBaseUrl = String.fromEnvironment(
   defaultValue: 'ws://127.0.0.1:8000',
 );
 
-/// `--dart-define=DEMO=true` switches back to the scripted phase-1 transcript
-/// so the UI can be demoed without a backend or microphone.
+/// `--dart-define=DEMO=true` switches to the scripted transcript so the UI can
+/// be demoed without a backend or microphone.
+///
+/// Web uses the real recording session too: the `record` plugin's web backend
+/// (`record_web`) captures 16 kHz mono PCM16 through an AudioWorklet.
 const bool kUseDemoSession = bool.fromEnvironment('DEMO', defaultValue: false);
 
-/// The web platform cannot capture raw 16 kHz PCM from the microphone, so it
-/// always falls back to the scripted demo session.
-bool get useDemoSession => kIsWeb || kUseDemoSession;
+bool get useDemoSession => kUseDemoSession;
 
 /// `ws(s)://host:port/ws/asr`
 Uri get asrEndpoint {

@@ -1,17 +1,23 @@
 # 课堂速记（Classroom Live Notes）
 
-## 云端部署
+## 云端部署（2026-11-27 最终交付）
 
 | 项目 | 值 |
 | --- | --- |
-| 前端（CloudBase 静态托管，正常） | https://educational-cheetah-d0bsf4e3c3a6-1527509554.tcloudbaseapp.com/ |
-| 后端 | ⚠️ 迁移中 → 见 [docs/DEPLOY_FREE.md](docs/DEPLOY_FREE.md)（Koyeb/Render 免费部署） |
+| **前端作品链接（手机/电脑浏览器直接打开）** | https://educational-cheetah-d0bsf4e3c3a6-1527509554.tcloudbaseapp.com/ |
+| 后端 API（Render 免费容器） | https://workbuddy-lozz.onrender.com |
+| WebSocket | `wss://workbuddy-lozz.onrender.com/ws/asr`（客户端由 `WS_BASE` 自动拼接） |
+| 健康检查 | `GET /health` → `{"status":"ok",...}` |
+| 代码仓库 | https://github.com/fallingintotheskyan-web/workbuddy （分支 `main`） |
 
-> **2026-11-15 变更**：CloudBase 云托管体验版免费期仅 7 天，到期后服务被隔离
-> （`SERVICE_FORBIDDEN: server is isolated`），前端会卡在「连接中」。
-> 后端改为部署到 Koyeb（推荐，免费实例不休眠）或 Render（备选，15 分钟无流量休眠）。
-> 完整迁移步骤、环境变量配置、前端重新打包命令见 **[docs/DEPLOY_FREE.md](docs/DEPLOY_FREE.md)**。
-> `server/Dockerfile` 为通用格式（监听 `$PORT`），仓库根目录附 `render.yaml` Blueprint。
+- 后端：Render Web Service `workbuddy`，Docker 部署（Root Directory=`server`，Dockerfile Path=`Dockerfile`，PORT=`10000`），
+  `DEEPGRAM_API_KEY` / `DEEPL_API_KEY` 通过 Render 环境变量注入，**不进代码与 Git**。
+- 前端：Flutter Web 构建时注入 `--dart-define=WS_BASE=wss://workbuddy-lozz.onrender.com`
+  （**只填域名，不带 `/ws/asr`**），产物 `client/build/web` 上传至 CloudBase 静态托管。
+- 2026-11-27 端到端验证：前端 200、后端 `/health` 200、CORS 预检 `access-control-allow-origin: *`、
+  WebSocket 握手 `101`（`curl` 因长连接保持超时退出属正常）。
+- Render 免费档 15 分钟无流量会休眠，首次连接冷启动 30–60 秒属正常。
+- 完整迁移与重建步骤见 **[docs/DEPLOY_FREE.md](docs/DEPLOY_FREE.md)**。
 
 <details>
 <summary>历史记录：2026-11-08 CloudBase 部署（已失效）</summary>

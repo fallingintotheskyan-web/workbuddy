@@ -1,0 +1,6 @@
+{
+  "envId": "educational-cheetah-d0bsf4e3c3a6",
+  "cloudrun": {
+    "name": "classroom-notes-api"
+  }
+}

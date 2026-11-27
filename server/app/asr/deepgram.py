@@ -56,6 +56,8 @@ class DeepgramAsrProvider(AsrProvider):
             "channels": "1",
             "interim_results": "true",
             "smart_format": "true",
+            "punctuate": "true",
+            "vad_events": "true",
             "endpointing": str(self._endpointing_ms),
             "utterance_end_ms": str(self._utterance_end_ms),
         }
@@ -65,6 +67,7 @@ class DeepgramAsrProvider(AsrProvider):
             params["language"] = self._language
 
         url = f"wss://api.deepgram.com/v1/listen?{urlencode(params)}"
+        logger.info("deepgram connect: %s", url)
         headers = {"Authorization": f"Token {self._api_key}"}
         try:
             self._ws = await websockets.connect(url, additional_headers=headers, max_size=2**22)

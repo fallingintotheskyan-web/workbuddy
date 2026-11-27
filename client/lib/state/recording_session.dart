@@ -47,6 +47,10 @@ class ErrorEvent extends SessionEvent {
 abstract class RecordingSession {
   Stream<SessionEvent> get events;
 
+  /// Absolute path of the captured debug audio (first seconds sent to ASR),
+  /// or null until it has been written.
+  String? get debugAudioPath;
+
   Future<void> start({required SourceLanguage source});
 
   /// Stops the session and returns the absolute path of the saved recording,
@@ -54,6 +58,9 @@ abstract class RecordingSession {
   Future<String?> stop();
 
   void updateTranslation({required bool enabled, required TargetLanguage target});
+
+  /// Switches the recognition language and re-opens the upstream stream.
+  Future<void> updateSource(SourceLanguage source);
 
   Future<void> dispose();
 }

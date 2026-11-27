@@ -19,6 +19,12 @@ server/.pytest_cache/
 server/logs/
 server/.env
 
+# 任何层级的 .env 变体一律忽略（密钥绝不入库），但保留示例模板
+**/.env
+**/.env.*
+!**/.env.example
+**/.venv/
+
 # OS / editors
 .DS_Store
 Thumbs.db

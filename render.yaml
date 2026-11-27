@@ -1,0 +1,29 @@
+# Render Blueprint — 课堂速记后端（FastAPI + WebSocket）
+# 用法：把本仓库 push 到 GitHub 后，在 Render Dashboard 选择
+# "New +" -> "Blueprint" 并选中该仓库即可自动创建服务。
+services:
+  - type: web
+    name: classroom-notes-api
+    runtime: docker
+    plan: free
+    region: singapore          # 离国内最近的区域，可选 oregon/frankfurt
+    dockerContext: ./server
+    dockerfilePath: ./server/Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true           # 每次 git push 自动重新部署
+    envVars:
+      # 敏感变量：sync: false 表示在 Dashboard 里手动填写，不进仓库
+      - key: DEEPGRAM_API_KEY
+        sync: false
+      - key: DEEPL_API_KEY
+        sync: false
+      - key: DEEPL_API_URL
+        value: https://api-free.deepl.com
+      - key: ASR_PROVIDER
+        value: deepgram
+      - key: TRANSLATE_PROVIDER
+        value: deepl
+      - key: DEEPGRAM_MODEL
+        value: nova-2
+      - key: ASR_DEFAULT_LANGUAGE
+        value: zh

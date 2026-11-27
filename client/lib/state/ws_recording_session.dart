@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../audio/audio_capture.dart';
+import '../audio/debug_recorder.dart';
 import '../audio/preroll_buffer.dart';
 import '../audio/recording_store.dart';
 import '../audio/vad.dart';
@@ -38,6 +39,7 @@ class WsRecordingSession implements RecordingSession {
   final VoiceActivityDetector _vad;
   final PreRollBuffer _prebuffer = PreRollBuffer(durationMs: 300);
   final RecordingStore _store = RecordingStore();
+  final DebugRecorder _debug = DebugRecorder();
   final StreamController<SessionEvent> _events = StreamController<SessionEvent>.broadcast();
 
   AsrWsClient? _client;
@@ -52,12 +54,15 @@ class WsRecordingSession implements RecordingSession {
   bool _reconnecting = false;
   bool _translationEnabled = false;
   TargetLanguage _target = TargetLanguage.english;
-  SourceLanguage _source = SourceLanguage.auto;
+  SourceLanguage _source = SourceLanguage.chinese;
   int _capturedBytes = 0;
   int _sentBytes = 0;
 
   @override
   Stream<SessionEvent> get events => _events.stream;
+
+  @override
+  String? get debugAudioPath => _debug.wavPath;
 
   @override
   Future<void> start({required SourceLanguage source}) async {
@@ -89,6 +94,27 @@ class WsRecordingSession implements RecordingSession {
       debugPrint('recording store init failed: $error');
     }
 
+    // Save the exact bytes sent to the ASR so the audio can be inspected.
+    String? debugDir;
+    try {
+      final external = await getExternalStorageDirectory();
+      debugDir = external?.path;
+    } catch (_) {
+      // Not available on this platform.
+    }
+    if (debugDir == null) {
+      try {
+        debugDir = (await getApplicationDocumentsDirectory()).path;
+      } catch (_) {}
+    }
+    if (debugDir != null) {
+      try {
+        await _debug.start('$debugDir/debug');
+      } catch (error) {
+        debugPrint('debug recorder init failed: $error');
+      }
+    }
+
     try {
       // Start capture first and buffer it, so no audio is lost while the
       // socket connects. The buffered audio is replayed once connected.
@@ -101,8 +127,7 @@ class WsRecordingSession implements RecordingSession {
       await _connect();
       final Uint8List pre = _prebuffer.drain();
       if (pre.isNotEmpty && _client != null) {
-        _sentBytes += pre.length;
-        _client!.sendAudio(pre);
+        _sendAudio(_client!, pre);
       }
       _emit(const StatusEvent(SessionStatus.listening));
     } catch (error) {
@@ -115,6 +140,32 @@ class WsRecordingSession implements RecordingSession {
     _translationEnabled = enabled;
     _target = target;
     _client?.sendJson(buildConfigureMessage(enabled: enabled, target: target));
+  }
+
+  @override
+  Future<void> updateSource(SourceLanguage source) async {
+    if (_source == source) return;
+    _source = source;
+    if (!_running) return;
+
+    // Re-open the ASR stream so the new language reaches Deepgram.
+    final AsrWsClient? old = _client;
+    _client = null;
+    await _messageSubscription?.cancel();
+    _messageSubscription = null;
+    await old?.close();
+
+    _emit(const StatusEvent(SessionStatus.connecting));
+    try {
+      await _connect();
+      final Uint8List pre = _prebuffer.drain();
+      if (pre.isNotEmpty && _client != null) {
+        _sendAudio(_client!, pre);
+      }
+      _emit(StatusEvent(_vad.isSpeaking ? SessionStatus.listening : SessionStatus.paused));
+    } catch (error) {
+      _fail('切换识别语言失败：$error');
+    }
   }
 
   @override
@@ -133,6 +184,7 @@ class WsRecordingSession implements RecordingSession {
     _client = null;
 
     final String? savedPath = await _store.finalize();
+    await _debug.finish();
 
     final double capturedSeconds = _capturedBytes / 32000;
     final double sentSeconds = _sentBytes / 32000;
@@ -183,12 +235,10 @@ class WsRecordingSession implements RecordingSession {
         _emit(const StatusEvent(SessionStatus.listening));
         final Uint8List pre = _prebuffer.drain();
         if (pre.isNotEmpty) {
-          _sentBytes += pre.length;
-          client.sendAudio(pre);
+          _sendAudio(client, pre);
         }
       }
-      _sentBytes += chunk.length;
-      client.sendAudio(chunk);
+      _sendAudio(client, chunk);
       _prebuffer.add(chunk);
     } else {
       _prebuffer.add(chunk);
@@ -199,6 +249,12 @@ class WsRecordingSession implements RecordingSession {
       }
     }
     _wasSpeaking = speaking;
+  }
+
+  void _sendAudio(AsrWsClient client, Uint8List bytes) {
+    _sentBytes += bytes.length;
+    _debug.write(bytes);
+    client.sendAudio(bytes);
   }
 
   void _onServerMessage(Map<String, dynamic> message) {
@@ -235,8 +291,7 @@ class WsRecordingSession implements RecordingSession {
         await _connect();
         final Uint8List pre = _prebuffer.drain();
         if (pre.isNotEmpty && _client != null) {
-          _sentBytes += pre.length;
-          _client!.sendAudio(pre);
+          _sendAudio(_client!, pre);
         }
         _emit(StatusEvent(_vad.isSpeaking ? SessionStatus.listening : SessionStatus.paused));
       } catch (_) {

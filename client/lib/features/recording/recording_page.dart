@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:media_kit/media_kit.dart';
 
 import '../../core/app_config.dart';
 import '../../core/app_theme.dart';
@@ -27,6 +28,8 @@ class _RecordingPageState extends State<RecordingPage> {
   Timer? _ticker;
   Duration _elapsed = Duration.zero;
   bool _stopping = false;
+  Player? _debugPlayer;
+  bool _debugNotified = false;
 
   @override
   void initState() {
@@ -42,6 +45,12 @@ class _RecordingPageState extends State<RecordingPage> {
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
       setState(() => _elapsed += const Duration(seconds: 1));
+      if (!_debugNotified && _session.debugAudioPath != null) {
+        _debugNotified = true;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('调试音频已保存：${_session.debugAudioPath}')),
+        );
+      }
     });
   }
 
@@ -50,6 +59,7 @@ class _RecordingPageState extends State<RecordingPage> {
     _ticker?.cancel();
     unawaited(_subscription?.cancel());
     unawaited(_session.dispose());
+    unawaited(_debugPlayer?.dispose());
     _transcript.dispose();
     super.dispose();
   }
@@ -66,7 +76,7 @@ class _RecordingPageState extends State<RecordingPage> {
 
   void _onSourceChanged(SourceLanguage source) {
     _transcript.setSource(source);
-    // Phase 2 re-opens the ASR stream with the new source language.
+    unawaited(_session.updateSource(source));
   }
 
   Future<void> _stop() async {
@@ -75,6 +85,24 @@ class _RecordingPageState extends State<RecordingPage> {
     final String? savedPath = await _session.stop();
     if (!mounted) return;
     Navigator.of(context).pop(savedPath);
+  }
+
+  Future<void> _playDebugAudio() async {
+    final String? path = _session.debugAudioPath;
+    if (path == null) return;
+    try {
+      _debugPlayer ??= Player();
+      await _debugPlayer!.open(Media(Uri.file(path).toString()), play: true);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('正在播放调试音频：$path')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('播放失败：$error')),
+      );
+    }
   }
 
   @override
@@ -108,6 +136,7 @@ class _RecordingPageState extends State<RecordingPage> {
                     ),
                   ),
                 ),
+                if (_session.debugAudioPath != null) _buildDebugBar(),
                 _buildFooter(context),
               ],
             );
@@ -231,6 +260,35 @@ class _RecordingPageState extends State<RecordingPage> {
           visualDensity: VisualDensity.compact,
         );
       }).toList(),
+    );
+  }
+
+  Widget _buildDebugBar() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+      ),
+      child: Row(
+        children: <Widget>[
+          Icon(Icons.bug_report_outlined, size: 16, color: Colors.white.withValues(alpha: 0.6)),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              '调试录音（发送给ASR的前5秒）',
+              style: TextStyle(fontSize: 12, color: Colors.white70),
+            ),
+          ),
+          TextButton.icon(
+            onPressed: _playDebugAudio,
+            icon: const Icon(Icons.play_arrow, size: 18),
+            label: const Text('播放', style: TextStyle(fontSize: 12)),
+          ),
+        ],
+      ),
     );
   }
 

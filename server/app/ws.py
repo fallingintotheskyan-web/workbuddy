@@ -120,6 +120,7 @@ class AsrConnection:
             self.language = requested
         else:
             raise ProtocolError(f"unsupported sourceLanguage: {requested}")
+        logger.info("start sourceLanguage=%s -> language=%s", requested, self.language)
 
     async def _receive_loop(self) -> None:
         assert self.provider is not None
@@ -181,6 +182,11 @@ class AsrConnection:
                     self.sequence += 1
                     self.finals += 1
                     final_id = f"{self.session_id}-{self.sequence}"
+                    logger.info(
+                        "final language=%s text=%s",
+                        self.language,
+                        event.text[:80],
+                    )
                     await self._send(
                         {
                             "type": "final",

@@ -1,5 +1,28 @@
 # 课堂速记（Classroom Live Notes）
 
+## 云端部署
+
+| 项目 | 值 |
+| --- | --- |
+| 前端（CloudBase 静态托管，正常） | https://educational-cheetah-d0bsf4e3c3a6-1527509554.tcloudbaseapp.com/ |
+| 后端 | ⚠️ 迁移中 → 见 [docs/DEPLOY_FREE.md](docs/DEPLOY_FREE.md)（Koyeb/Render 免费部署） |
+
+> **2026-11-15 变更**：CloudBase 云托管体验版免费期仅 7 天，到期后服务被隔离
+> （`SERVICE_FORBIDDEN: server is isolated`），前端会卡在「连接中」。
+> 后端改为部署到 Koyeb（推荐，免费实例不休眠）或 Render（备选，15 分钟无流量休眠）。
+> 完整迁移步骤、环境变量配置、前端重新打包命令见 **[docs/DEPLOY_FREE.md](docs/DEPLOY_FREE.md)**。
+> `server/Dockerfile` 为通用格式（监听 `$PORT`），仓库根目录附 `render.yaml` Blueprint。
+
+<details>
+<summary>历史记录：2026-11-08 CloudBase 部署（已失效）</summary>
+
+- 环境 `educational-cheetah-d0bsf4e3c3a6`（上海，trial），CloudRun 服务 `classroom-notes-api`，
+  地址 `https://classroom-notes-api-343538-4-1527509554.sh.run.tcloudbase.com`（已隔离）。
+- 密钥通过 CloudRun 环境变量注入；网关路由需 `AccessType=DIRECT` + 路径透传。
+- 重新部署后端：`manageCloudRun(action="deploy")`；前端：`manageHosting(action="upload")`。
+</details>
+
+
 课堂实时录音 → 流式字幕 → 可选翻译的跨平台 App。Flutter 客户端（Android / Windows），
 FastAPI 负责代理 ASR 与翻译，密钥只存在后端 `.env`。
 

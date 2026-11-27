@@ -15,7 +15,7 @@ class TranscriptController extends ChangeNotifier {
   SessionStatus _status = SessionStatus.idle;
   bool _translateEnabled = false;
   TargetLanguage _target = TargetLanguage.english;
-  SourceLanguage _source = SourceLanguage.auto;
+  SourceLanguage _source = SourceLanguage.chinese;
   String? _error;
 
   List<TranscriptLine> get lines => List<TranscriptLine>.unmodifiable(_lines);
